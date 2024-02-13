@@ -1,0 +1,1 @@
+gcc ./src/main.c -o ./build/snake-game-c -lncurses
