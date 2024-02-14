@@ -9,6 +9,8 @@ const int RENDER_SPEED_MS = 150;
 const int GAME_SPEED = 1;
 const int FOOD_CNT = 3;
 const int INIT_SNAKE_LENGTH = 3;
+int quit = 0;
+int gameover = 0;
 enum boardElements { EMPTY, SNAKE, FOOD, WALL };
 typedef enum Direction { UP, DOWN, RIGHT, LEFT } Direction;
 
@@ -20,6 +22,7 @@ typedef struct Segment {
 
 typedef struct Snake {
   Segment* head;
+  Segment* tail;
   int tailRow;
   int tailCol;
   int length;
@@ -28,16 +31,16 @@ typedef struct Snake {
 } Snake;
 
 void placeFood(char board[BOARD_SIZE][BOARD_SIZE]) {
-  int x, y;
+  int row, col;
 
   srand(time(NULL)); // seed rng
 
   do {
-    x = rand() % BOARD_SIZE;
-    y = rand() % BOARD_SIZE;
-  } while (board[x][y] != EMPTY);
+    row = rand() % BOARD_SIZE;
+    col = rand() % BOARD_SIZE;
+  } while (board[row][col] != EMPTY);
 
-  board[x][y] = FOOD;
+  board[row][col] = FOOD;
 }
 
 void initBoard(char board[BOARD_SIZE][BOARD_SIZE]) {
@@ -81,7 +84,15 @@ void renderBoard(char board[BOARD_SIZE][BOARD_SIZE]) {
 }
 
 void updateBoard(char board[BOARD_SIZE][BOARD_SIZE], Snake* snake) {
+  int shouldGrow = 0;
   Segment* currentSegment = snake->head;
+
+  int headContact = board[snake->head->row][snake->head->col];
+  if (headContact == FOOD) {
+    shouldGrow = 1;
+  } else if (headContact == SNAKE || headContact == WALL) {
+    gameover = 1;
+  }
 
   while(currentSegment->next != NULL) {
     board[currentSegment->row][currentSegment->col] = SNAKE;
@@ -92,6 +103,17 @@ void updateBoard(char board[BOARD_SIZE][BOARD_SIZE], Snake* snake) {
     snake->newBorn = 0;
   } else {
     board[snake->tailRow][snake->tailCol] = EMPTY;
+  }
+
+  if (shouldGrow) {
+    Segment* newSegment = (Segment*)malloc(sizeof(Segment));
+    newSegment->row = snake->tailRow;
+    newSegment->col = snake->tailCol;
+    newSegment->next = NULL;
+    snake->length++;
+    snake->tail->next = newSegment;
+    snake->tail = newSegment;
+    placeFood(board);
   }
 
   return;
@@ -118,79 +140,85 @@ Snake* initSnake(int row, int col) {
     prev = curr;
   }
   
+  snake->head = head;
+  snake->tail = curr;
   snake->length = INIT_SNAKE_LENGTH;
   snake->currentDirection = RIGHT;
-  snake->head = head;
   snake->newBorn = 1;
 
   return snake;
 };
 
 void moveSnake(Snake* snake, Direction direction) {
+  // Update snake's current direction
   snake->currentDirection = direction;
-  int currentHeadPosRow = snake->head->row;
-  int currentHeadPosCol = snake->head->col;
 
+  // Store previous segment
+  int prevRow = snake->head->row;
+  int prevCol = snake->head->col;
+  int tmpRow, tmpCol;
 
-  Segment* currentSegment = snake->head;
-  int tmpRow;
-  int tmpCol;
-  int first = 1;
-  while(currentSegment->next != NULL) {
-    snake->tailRow = currentSegment->next->row;
-    snake->tailCol = currentSegment->next->col;
-    if (first) {
-      tmpRow = currentSegment->next->row;
-      tmpCol = currentSegment->next->col;
-      currentSegment->next->row = currentSegment -> row;
-      currentSegment->next->col = currentSegment -> col;
-      first = 0;
-    } else {
-      currentSegment->next->row = tmpRow;
-      currentSegment->next->col = tmpCol;
-      tmpRow = currentSegment->next->row;
-      tmpCol = currentSegment->next->col;
-    }
-    currentSegment = currentSegment->next;
-  }
-
+  // Update Head Position
   switch(snake->currentDirection) {
     case UP:
-      snake->head->row = currentHeadPosRow - 1;
+      snake->head->row -= 1;
       break;
 
     case DOWN:
-      snake->head->row = currentHeadPosRow + 1;
+      snake->head->row += 1;
       break;
 
     case LEFT:
-      snake->head->col = currentHeadPosCol - 1;
+      snake->head->col -= 1;
       break;
 
     case RIGHT:
-      snake->head->col = currentHeadPosCol + 1;
+      snake->head->col += 1;
       break;
   }
+
+  // Update following segments
+  Segment* current = snake->head->next;
+  
+  while (current != NULL) {
+    // Store last segment's position to clear
+    snake->tailRow = current->row;
+    snake->tailCol = current->col;
+
+    // Temporarily store current position
+    tmpRow = current->row;
+    tmpCol = current->col;
+
+    // Update current position to previous segment's position
+    current->row = prevRow;
+    current->col = prevCol;
+
+    // Update previous segment position to current segment's position
+    prevRow = tmpRow;
+    prevCol = tmpCol;
+
+    // move to next segment
+    current = current->next;
+  }
+
+  return;
 }
 
 void startGame(char gameBoard[BOARD_SIZE][BOARD_SIZE]) {
-  initscr(); // Start ncurses mode
-  cbreak(); // No Buffering
-  noecho(); // No Echo
-  nodelay(stdscr, TRUE); // Non-blocking getch()
-  keypad(stdscr, TRUE); // Enable Special Key 
-
-  int quit = 0;
   int ch;
   Snake* snake = initSnake(BOARD_SIZE/2, BOARD_SIZE/2);
 
-  while (!quit) {
+  while (!gameover) {
+    // Clear screen
     clear();
 
+    // Get input from keyboard
     ch = getch();
 
+    // Process Input
     switch(ch) {
       case 'w':
+        // Prevent snake move to opposite direction
         (snake->currentDirection == DOWN) ? moveSnake(snake, snake->currentDirection) : moveSnake(snake, UP);
         break;
 
@@ -216,23 +244,35 @@ void startGame(char gameBoard[BOARD_SIZE][BOARD_SIZE]) {
         break;
     }
 
+    // Update game status
     updateBoard(gameBoard, snake);
 
+    // Render gameboard
     renderBoard(gameBoard);
 
+    // Refresh screen
     refresh();
 
+    // Set delay
     usleep(1000 * RENDER_SPEED_MS / GAME_SPEED);
   }
-
-  endwin();
 
   return;
 }
 
 int main(void) {
-  char gameBoard[BOARD_SIZE][BOARD_SIZE];
-  initBoard(gameBoard);
+  initscr(); // Start ncurses mode
+  cbreak(); // No Buffering
+  noecho(); // No Echo
+  nodelay(stdscr, TRUE); // Non-blocking getch()
+  keypad(stdscr, TRUE); // Enable Special Key 
 
-  startGame(gameBoard);
+  while(!quit) {
+    gameover = 0;
+    char gameBoard[BOARD_SIZE][BOARD_SIZE];
+    initBoard(gameBoard);
+    startGame(gameBoard);
+  }
+  endwin();
+  return 1;
 }
