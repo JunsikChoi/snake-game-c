@@ -26,9 +26,17 @@ To play the game, you will need a C compiler installed on your system. The game 
    cd snake-game-c
    ```
 3. Compile the game using GCC or any C compiler:
+
    ```
-   ./build.sh
+   gcc ./src/main.c -o ./build/snake-game-c -lncurses
    ```
+
+   or, in macOS
+
+   ```
+   clang ./src/main.c -o ./build/snake-game-c -lncurses
+   ```
+
    Note: The `-lncurses` flag is required for terminal handling (Linux/macOS).
 
 ### Running the Game
