@@ -9,10 +9,13 @@ const int RENDER_SPEED_MS = 150;
 const int GAME_SPEED = 1;
 const int FOOD_CNT = 3;
 const int INIT_SNAKE_LENGTH = 3;
-int quit = 0;
-int gameover = 0;
+
 enum boardElements { EMPTY, SNAKE, FOOD, WALL };
 typedef enum Direction { UP, DOWN, RIGHT, LEFT } Direction;
+
+int quit = 0;
+int gameover = 0;
+int bestScore = INIT_SNAKE_LENGTH;
 
 typedef struct Segment {
   int row; // Segment Row Position
@@ -83,6 +86,14 @@ void renderBoard(char board[BOARD_SIZE][BOARD_SIZE]) {
   }
 }
 
+void renderHeader(Snake* snake) {
+  printw("\n");
+  printw("SNAKE GAME v0.0.1\n");
+  printw("UP : W / DOWN : S / LEFT : A / RIGHT : D / Quit: Q\n");
+  printw("SCORE: %d \n", snake->length);
+  printw("BEST SCORE: %d \n\n", bestScore);
+}
+
 void updateBoard(char board[BOARD_SIZE][BOARD_SIZE], Snake* snake) {
   int shouldGrow = 0;
   Segment* currentSegment = snake->head;
@@ -91,6 +102,9 @@ void updateBoard(char board[BOARD_SIZE][BOARD_SIZE], Snake* snake) {
   if (headContact == FOOD) {
     shouldGrow = 1;
   } else if (headContact == SNAKE || headContact == WALL) {
+    if ((snake->length) > bestScore) {
+      bestScore = snake->length;
+    }
     gameover = 1;
   }
 
@@ -211,6 +225,9 @@ void startGame(char gameBoard[BOARD_SIZE][BOARD_SIZE]) {
   while (!gameover) {
     // Clear screen
     clear();
+
+    // Render Header
+    renderHeader(snake);
 
     // Get input from keyboard
     ch = getch();
